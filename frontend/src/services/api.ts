@@ -1,0 +1,1 @@
+import axios from 'axios';export const api=axios.create({baseURL:'/api',withCredentials:true,timeout:10000});export async function mutate(path:string,data?:unknown){const {data:csrf}=await api.get('/auth/csrf');return api.post(path,data,{headers:{'X-CSRF-TOKEN':csrf.token}});}
