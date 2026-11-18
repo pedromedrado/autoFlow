@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 public static class Seed {
  public static async Task Run(IServiceProvider services,IConfiguration config){
  var password=config["Seed:Password"]??throw new InvalidOperationException("Configure Seed__Password (12+ caracteres, maiúscula, número e símbolo).");
- var db=services.GetRequiredService<AppDbContext>();if(db.Database.IsSqlite())await db.Database.EnsureCreatedAsync();else await db.Database.MigrateAsync();
+ var db=services.GetRequiredService<AppDbContext>();if(db.Database.IsSqlite())await LocalOperationsSchema.EnsureAsync(db);else await db.Database.MigrateAsync();
  var roles=services.GetRequiredService<RoleManager<IdentityRole>>();var users=services.GetRequiredService<UserManager<AppUser>>();
  foreach(var r in Roles.All)if(!await roles.RoleExistsAsync(r))Check(await roles.CreateAsync(new(r)));
  var id=Guid.Parse("a1000000-0000-0000-0000-000000000001");

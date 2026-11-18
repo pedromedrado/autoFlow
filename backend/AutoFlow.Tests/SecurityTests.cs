@@ -7,6 +7,12 @@ using Xunit;
 public class SecurityTests {
  [Theory][InlineData("bad", "")][InlineData("", "secret")]
  public void InvalidLoginRejected(string email,string password)=>Assert.False(new LoginValidator().Validate(new LoginRequest(email,password)).IsValid);
+ [Fact]
+ public void OnlyMasterCanManageUsers()
+ {
+  Assert.Contains(Permissions.ManageUsers, Permissions.For(Roles.Master));
+  Assert.All(Roles.Operational, role => Assert.DoesNotContain(Permissions.ManageUsers, Permissions.For(role)));
+ }
  [Fact] public void MechanicCannotManageOrPrice(){Assert.DoesNotContain(Permissions.ManageWorkshop,Permissions.For(Roles.Mechanic));Assert.DoesNotContain(Permissions.CreateOrders,Permissions.For(Roles.Mechanic));}
  [Fact] public void ConsultantCanCreate()=>Assert.Contains(Permissions.CreateOrders,Permissions.For(Roles.Consultant));
  [Fact] public async Task TenantQueriesNeverReturnOtherDealership(){

@@ -16,7 +16,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentTenant,CurrentTenant>();
 builder.Services.AddScoped<IValidator<LoginRequest>,LoginValidator>();
 var useSqlite=builder.Configuration["Database:Provider"]=="Sqlite";
-if(useSqlite && !builder.Environment.IsDevelopment())throw new InvalidOperationException("SQLite dispon�vel somente em Development.");
+if(useSqlite && !builder.Environment.IsDevelopment())throw new InvalidOperationException("SQLite disponível somente em Development.");
 builder.Services.AddDbContext<AppDbContext>(o=>{
  var connection=builder.Configuration.GetConnectionString("Database")??throw new InvalidOperationException("Configure ConnectionStrings__Database.");
  if(useSqlite)o.UseSqlite(connection);else o.UseSqlServer(connection);
@@ -32,9 +32,10 @@ builder.Services.ConfigureApplicationCookie(o=> {
  o.Events.OnRedirectToAccessDenied=c=>{c.Response.StatusCode=403;return Task.CompletedTask;};
 });
 builder.Services.AddScoped<IUserClaimsPrincipalFactory<AppUser>, TenantClaimsFactory>();
-builder.Services.AddAuthorization(o=>{foreach(var p in new[]{Permissions.ReadOrders,Permissions.CreateOrders,Permissions.ManageWorkshop,Permissions.ExecuteService}) o.AddPolicy(p,b=>b.RequireClaim("permission",p));});
+builder.Services.AddAuthorization(o=>{foreach(var p in new[]{Permissions.ReadOrders,Permissions.CreateOrders,Permissions.ManageWorkshop,Permissions.ExecuteService,Permissions.ManageUsers}) o.AddPolicy(p,b=>b.RequireClaim("permission",p));});
 builder.Services.AddAntiforgery(o=>{o.HeaderName="X-CSRF-TOKEN";o.Cookie.Name="__Host-AutoFlow-CSRF";o.Cookie.SecurePolicy=CookieSecurePolicy.Always;o.Cookie.SameSite=SameSiteMode.Strict;});
 builder.Services.AddRateLimiter(o=>{o.RejectionStatusCode=429;o.AddPolicy("login",c=>RateLimitPartition.GetFixedWindowLimiter(c.Connection.RemoteIpAddress?.ToString()??"unknown",_=>new FixedWindowRateLimiterOptions{PermitLimit=10,Window=TimeSpan.FromMinutes(1),QueueLimit=0}));});
+builder.Services.Configure<SecurityStampValidatorOptions>(o => o.ValidationInterval = TimeSpan.Zero);
 builder.Services.AddProblemDetails();
 var app=builder.Build();
 app.UseExceptionHandler();app.UseHttpsRedirection();
@@ -66,8 +67,19 @@ app.MapGet("/api/auth/me",async(ClaimsPrincipal p,UserManager<AppUser> users)=>{
 app.MapGet("/api/dealership",async(AppDbContext db)=>Results.Ok(await db.Dealerships.Select(x=>new{x.Id,x.Name}).SingleAsync())).RequireAuthorization();
 app.MapGet("/api/team",async(AppDbContext db,ICurrentTenant tenant)=>Results.Ok(await db.Users.Where(x=>x.DealershipId==tenant.DealershipId).Select(x=>new{x.Id,x.DisplayName,x.Email}).ToListAsync())).RequireAuthorization(Permissions.ManageWorkshop);
 app.MapGet("/api/audit",async(AppDbContext db)=>Results.Ok(await db.AuditLogs.OrderByDescending(x=>x.CreatedAt).Take(100).ToListAsync())).RequireAuthorization(Permissions.ManageWorkshop);
+app.MapAdministration();
+app.MapOperations();
+app.MapWorkshop();
+app.MapMechanic();
 if(args.Contains("--migrate")){using var scope=app.Services.CreateScope();await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();return;}
 if(args.Contains("--seed")){if(!app.Environment.IsDevelopment())throw new InvalidOperationException("Seed disponível apenas em Development.");using var scope=app.Services.CreateScope();await Seed.Run(scope.ServiceProvider,app.Configuration);return;}
+if (useSqlite && app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Database:PrepareLocalOperations"))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await LocalOperationsSchema.EnsureAsync(db);
+    app.Logger.LogInformation("Armazenamento local de lojas, serviços e ordens de serviço pronto.");
+}
 app.Run();
 public partial class Program {}
 public sealed class CurrentTenant(IHttpContextAccessor accessor):ICurrentTenant {public Guid? DealershipId=>Guid.TryParse(accessor.HttpContext?.User.FindFirstValue("dealership"),out var id)?id:null;}

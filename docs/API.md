@@ -9,3 +9,13 @@ Todas as operações usam HTTPS e JSON. Cookie __Host-AutoFlow HttpOnly/Secure/S
 - GET /api/team: membros da concessionária; exige workshop.manage.
 - GET /api/audit: últimos 100 eventos da concessionária; exige workshop.manage.
 Não confiar em cabeçalhos de proxy sem configurar proxies conhecidos. Usuários só são provisionados pelo seed local nesta fase; não há cadastro público.
+
+## Catálogo e abertura de OS
+
+- GET /api/operations/stores, /services e /orders: Master, Consultor e Gerente consultam registros da própria concessionária.
+- POST /api/operations/stores e /services: Master cadastra lojas e serviços. TMO em minutos e preço em reais.
+- POST /api/operations/orders: Master ou Consultor informa loja, cliente, veículo, placa e IDs de serviços. A API registra os serviços, o TMO e os preços da abertura.
+
+No SQL Server, a migration OperationsCatalog cria as tabelas. No ambiente local,
+o perfil AutoFlow-Isolado usa uma cópia do SQLite de teste com as novas tabelas.
+Para um SQLite novo, o seed de Development cria o esquema completo.
